@@ -1,0 +1,194 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maze Solver Visualizer</title>
+<style>
+body{
+    font-family: Arial;
+    background:#0f172a;
+    color:white;
+    margin:0;
+}h1{ text-align:center; margin:20px; }
+
+.controls{ text-align:center; margin:10px; }
+
+button{ padding:10px 15px; margin:5px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+
+.container{ display:flex; justify-content:center; align-items:flex-start; gap:30px; padding:20px; flex-wrap:wrap; }
+
+#grid{ display:grid; gap:5px; }
+
+.cell{ width:40px; height:40px; background:#1e293b; border-radius:6px; cursor:pointer; transition:0.15s; }
+
+.cell.active{ background:#22c55e; }
+
+.cell.start{ background:#3b82f6; }
+
+.cell.end{ background:#ef4444; }
+
+#paths{ max-height:400px; overflow:auto; min-width:200px; }
+
+.path-item{ background:#1e293b; margin:5px; padding:8px; border-radius:5px; text-align:left; }
+
+/* MOBILE */ @media (max-width: 700px){ .container{ flex-direction:column; align-items:center; } #paths{ width:100%; } } </style>
+
+</head>
+<body><h1>Maze Solver Visualizer</h1><div class="controls">
+    Grid Size: <input type="number" id="size" value="5" min="2" max="12">
+    <button onclick="createGrid()">Create Grid</button>
+    <button onclick="solveMaze()">Solve</button>
+    <button onclick="fillAll()">Fill All</button>
+    <button onclick="clearAll()">Clear All</button>
+</div><div class="container">
+    <div id="grid"></div>
+    <div id="paths"></div>
+</div><script>
+let grid = [];
+let n = 5;
+let isRightMouseDown = false;
+let isTouching = false;
+
+function createGrid(){
+    n = parseInt(document.getElementById("size").value);
+    const gridDiv = document.getElementById("grid");
+    gridDiv.innerHTML = "";
+
+    gridDiv.style.gridTemplateColumns = `repeat(${n}, 40px)`;
+
+    grid = Array.from({length:n}, ()=> Array(n).fill(0));
+
+    for(let i=0;i<n;i++){
+        for(let j=0;j<n;j++){
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+
+            function toggle(){
+                if((i===0 && j===0) || (i===n-1 && j===n-1)) return;
+                grid[i][j] = 1;
+                cell.classList.add("active");
+            }
+
+            function untoggle(){
+                if((i===0 && j===0) || (i===n-1 && j===n-1)) return;
+                grid[i][j] = 0;
+                cell.classList.remove("active");
+            }
+
+            cell.onclick = ()=>{
+                if((i===0 && j===0) || (i===n-1 && j===n-1)) return;
+                grid[i][j] = grid[i][j] ? 0 : 1;
+                cell.classList.toggle("active");
+            }
+
+            // RIGHT CLICK DRAG
+            cell.oncontextmenu = (e)=> e.preventDefault();
+
+            cell.onmousedown = (e)=>{
+                if(e.button === 2){
+                    isRightMouseDown = true;
+                    toggle();
+                }
+            }
+
+            cell.onmouseover = ()=>{
+                if(isRightMouseDown) toggle();
+            }
+
+            // TOUCH SUPPORT
+            cell.ontouchstart = ()=>{
+                isTouching = true;
+                toggle();
+            }
+
+            cell.ontouchmove = (e)=>{
+                const touch = e.touches[0];
+                const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+                if(elem && elem.classList.contains("cell")){
+                    elem.classList.add("active");
+                }
+            }
+
+            if(i===0 && j===0){
+                cell.classList.add("start");
+                grid[i][j] = 1;
+            }
+            if(i===n-1 && j===n-1){
+                cell.classList.add("end");
+                grid[i][j] = 1;
+            }
+
+            gridDiv.appendChild(cell);
+        }
+    }
+
+    document.body.onmouseup = ()=>{
+        isRightMouseDown = false;
+    }
+}
+
+function fillAll(){
+    const cells = document.querySelectorAll(".cell");
+    cells.forEach((cell, idx)=>{
+        let i = Math.floor(idx/n);
+        let j = idx % n;
+        if((i===0 && j===0) || (i===n-1 && j===n-1)) return;
+        grid[i][j] = 1;
+        cell.classList.add("active");
+    });
+}
+
+function clearAll(){
+    const cells = document.querySelectorAll(".cell");
+    cells.forEach((cell, idx)=>{
+        let i = Math.floor(idx/n);
+        let j = idx % n;
+        if((i===0 && j===0) || (i===n-1 && j===n-1)) return;
+        grid[i][j] = 0;
+        cell.classList.remove("active");
+    });
+}
+
+function solveMaze(){
+    let paths = [];
+    let visited = Array.from({length:n}, ()=> Array(n).fill(0));
+
+    function dfs(r,c,str){
+        if(r<0 || c<0 || r>=n || c>=n || grid[r][c]===0 || visited[r][c]) return;
+
+        if(r===n-1 && c===n-1){
+            paths.push(str);
+            return;
+        }
+
+        visited[r][c] = 1;
+
+        dfs(r-1,c,str+"U");
+        dfs(r+1,c,str+"D");
+        dfs(r,c-1,str+"L");
+        dfs(r,c+1,str+"R");
+
+        visited[r][c] = 0;
+    }
+
+    dfs(0,0,"");
+
+    const pathsDiv = document.getElementById("paths");
+    pathsDiv.innerHTML = "";
+
+    if(paths.length===0){
+        pathsDiv.innerHTML = "<p>No paths found</p>";
+        return;
+    }
+
+    paths.forEach((p,idx)=>{
+        const div = document.createElement("div");
+        div.classList.add("path-item");
+        div.innerText = `${idx+1}. ${p}`;
+        pathsDiv.appendChild(div);
+    });
+}
+
+createGrid();
+</script></body>
+</html>
